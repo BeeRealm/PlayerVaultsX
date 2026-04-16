@@ -1,0 +1,50 @@
+name: Upstream Sync
+
+on:
+  schedule:
+    # Every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Sync from KittehDev/PlayerVaultsX
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/KittehDev/PlayerVaultsX.git
+
+      - name: Fetch upstream
+        run: git fetch upstream
+
+      - name: Check for upstream changes
+        id: check_changes
+        run: |
+          UPSTREAM_COMMITS=$(git rev-list HEAD..upstream/master --count)
+          echo "upstream_commits=$UPSTREAM_COMMITS" >> $GITHUB_OUTPUT
+          echo "Upstream has $UPSTREAM_COMMITS new commits."
+
+      - name: Merge upstream into master
+        if: steps.check_changes.outputs.upstream_commits != '0'
+        run: |
+          git merge upstream/master --no-edit -m "chore: auto-sync from KittehDev/PlayerVaultsX upstream"
+
+      - name: Push merged changes
+        if: steps.check_changes.outputs.upstream_commits != '0'
+        run: git push origin master
+
+      - name: No changes
+        if: steps.check_changes.outputs.upstream_commits == '0'
+        run: echo "Fork is already up to date with upstream. Nothing to do."
